@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>야구다트</title>
+<style>
+  :root{
+    --ink:#0b0b0b; --panel:#161513; --panel-2:#1e1c19; --cream:#EFE6D2;
+    --gold:#FFD54F; --red:#D42E2E; --green:#1B8A5A; --blue:#1D68C4; --muted:#8a857c;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--ink);color:var(--cream);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;padding:22px 16px 40px;}
+  .app{max-width:560px;margin:0 auto;}
+  h1{font-size:19px;font-weight:600;letter-spacing:.3px;margin:0 0 14px;text-align:center;color:var(--cream);}
+  .modes{display:flex;gap:8px;margin-bottom:12px;}
+  .modes button{flex:1;padding:9px 0;border-radius:8px;border:1px solid #38352f;background:var(--panel);color:var(--cream);font-size:13px;font-weight:600;cursor:pointer;}
+  .modes button.active{background:var(--gold);color:#241c00;border-color:var(--gold);}
+
+  .score-banner{background:var(--panel);border:1px solid #38352f;border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;}
+  .score-banner .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+  .score-banner .value{font-size:44px;font-weight:700;line-height:1;color:var(--gold);}
+  .score-banner .meta{text-align:right;font-size:12px;color:var(--muted);}
+  .score-banner .meta b{color:var(--cream);font-size:15px;}
+
+  .play-row{display:flex;gap:12px;align-items:stretch;}
+  #board-wrap{position:relative;flex:1;aspect-ratio:1/1;border-radius:12px;overflow:hidden;background:#0b0b0b;cursor:crosshair;border:1px solid #2a2823;}
+  #crosshair{position:absolute;width:16px;height:16px;border:2px solid #fff;border-radius:50%;pointer-events:none;transform:translate(-50%,-50%);box-shadow:0 0 0 1px rgba(0,0,0,.5);}
+  .hit-ring{position:absolute;width:40px;height:40px;border:3px solid;border-radius:50%;transform:translate(-50%,-50%) scale(.3);opacity:1;pointer-events:none;z-index:7;animation:ringPulse .6s ease-out forwards;}
+  .hit-pop{position:absolute;transform:translate(-50%,-50%);font-weight:800;font-size:20px;letter-spacing:.06em;pointer-events:none;z-index:8;text-shadow:0 2px 5px rgba(0,0,0,.85);animation:popText .75s ease-out forwards;}
+  @keyframes ringPulse{to{transform:translate(-50%,-50%) scale(2.4);opacity:0;}}
+  @keyframes popText{0%{opacity:0;transform:translate(-50%,-50%) translateY(0) scale(.6);}20%{opacity:1;transform:translate(-50%,-50%) translateY(-6px) scale(1.2);}100%{opacity:0;transform:translate(-50%,-50%) translateY(-34px) scale(1);}}
+
+  .gauge-col{width:56px;display:flex;flex-direction:column;align-items:center;}
+  .gauge-col .cap{font-size:10px;color:var(--muted);margin-bottom:4px;text-align:center;line-height:1.3;}
+
+  .dart-slots{display:flex;gap:8px;margin-top:12px;}
+  .dart-slot{flex:1;background:var(--panel);border:1px solid #38352f;border-radius:8px;padding:8px 0;text-align:center;font-size:15px;font-weight:700;color:var(--muted);}
+  .dart-slot.filled{color:var(--cream);}
+  .dart-slot.miss{color:#7a4b4b;}
+
+  #cricket-targets{display:none;flex-wrap:wrap;gap:6px;margin-top:12px;}
+  .ct-badge{flex:1;min-width:58px;background:var(--panel);border:1px solid #38352f;border-radius:8px;padding:6px 4px;text-align:center;}
+  .ct-badge.closed{border-color:var(--gold);background:#2a2410;}
+  .ct-num{font-size:13px;font-weight:700;color:var(--cream);}
+  .ct-dots{display:flex;justify-content:center;gap:3px;margin-top:4px;}
+  .ct-dots .dot{width:6px;height:6px;border-radius:50%;background:#3a372f;}
+  .ct-dots .dot.on{background:var(--gold);}
+
+  #result{margin-top:10px;min-height:20px;font-size:14px;text-align:center;color:var(--muted);}
+  .game-over-banner{border:2px solid var(--gold);background:#2a2410;border-radius:10px;padding:10px 14px;text-align:center;}
+  .go-title{font-size:17px;font-weight:800;color:var(--gold);letter-spacing:.1em;}
+  .go-msg{font-size:13px;color:var(--cream);margin-top:3px;}
+  .btn-row{display:flex;gap:8px;margin-top:8px;}
+  .btn-row button{flex:1;padding:10px 0;border-radius:8px;border:1px solid #38352f;background:var(--panel);color:var(--cream);font-size:14px;font-weight:600;cursor:pointer;}
+  .btn-row button:disabled{opacity:.4;cursor:not-allowed;}
+  #next-round{display:none;background:var(--green);border-color:var(--green);color:#eafff2;}
+
+  .lb{margin-top:22px;background:var(--panel);border:1px solid #38352f;border-radius:12px;padding:16px;}
+  .lb h2{font-size:14px;margin:0 0 10px;color:var(--gold);letter-spacing:.04em;}
+  .lb-row{display:flex;align-items:center;gap:10px;padding:6px 4px;font-size:14px;border-bottom:1px solid #2a2823;}
+  .lb-row:last-child{border-bottom:none;}
+  .lb-rank{width:22px;color:var(--muted);font-weight:700;}
+  .lb-first .lb-rank{color:var(--gold);}
+  .lb-name{flex:1;color:var(--cream);}
+  .lb-score{font-weight:700;color:var(--cream);}
+  .save-row{display:none;gap:8px;margin-top:12px;}
+  .save-row input{flex:1;padding:8px 10px;border-radius:8px;border:1px solid #38352f;background:#0f0e0c;color:var(--cream);font-size:14px;}
+  .save-row button{padding:8px 14px;border-radius:8px;border:1px solid var(--gold);background:var(--gold);color:#241c00;font-weight:700;font-size:14px;cursor:pointer;}
+  .save-note{font-size:12px;color:var(--muted);margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>야구다트</h1>
+
+  <div class="modes">
+    <button id="mode-countup">Count-up (8R)</button>
+    <button id="mode-501">501 (10R)</button>
+    <button id="mode-cricket">Cricket (15R)</button>
+  </div>
+
+  <div class="score-banner">
+    <div>
+      <div class="label" id="score-label">Score</div>
+      <div class="value" id="total">0</div>
+    </div>
+    <div class="meta">Round <b id="round">1</b>/<b id="max-round">8</b><br>Darts left <b id="darts">3</b></div>
+  </div>
+
+  <div class="play-row">
+    <div id="board-wrap">
+      <svg id="board" viewBox="0 0 400 400" style="width:100%;height:100%;display:block;"></svg>
+      <div id="crosshair"></div>
+    </div>
+    <div class="gauge-col">
+      <div class="cap">Perfect<br>zone</div>
+      <svg id="gauge-svg" viewBox="0 0 50 300" style="flex:1;width:56px;overflow:visible;">
+        <path id="gauge-path" d="" fill="none" stroke="url(#gaugeGrad)" stroke-width="5" stroke-linecap="round"></path>
+        <path id="great-path" d="" fill="none" stroke="#EFE6D2" stroke-width="6" stroke-linecap="round" opacity="0.85"></path>
+        <path id="perfect-path" d="" fill="none" stroke="#FFD54F" stroke-width="7" stroke-linecap="round"></path>
+        <defs>
+          <linearGradient id="gaugeGrad" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stop-color="#1D68C4"></stop>
+            <stop offset="0.5" stop-color="#1D9E75"></stop>
+            <stop offset="1" stop-color="#D42E2E"></stop>
+          </linearGradient>
+        </defs>
+        <circle id="gauge-marker" cx="25" cy="290" r="6" fill="#fff" stroke="#111" stroke-width="1.5"></circle>
+      </svg>
+    </div>
+  </div>
+
+  <div class="dart-slots">
+    <div class="dart-slot" id="slot-0">–</div>
+    <div class="dart-slot" id="slot-1">–</div>
+    <div class="dart-slot" id="slot-2">–</div>
+  </div>
+
+  <div id="cricket-targets"></div>
+
+  <div id="result"></div>
+
+  <div class="btn-row"><button id="next-round">Next round</button></div>
+  <div class="btn-row"><button id="undo-dart">이전 다트 취소 (9)</button></div>
+  <div class="btn-row"><button id="reset">Reset game</button></div>
+
+  <div class="lb">
+    <h2>🏆 명예의 전당 (Count-up Top 10)</h2>
+    <div id="leaderboard-list"><div style="opacity:.6;font-size:13px;">불러오는 중…</div></div>
+    <div class="save-row" id="save-row">
+      <input id="name-input" type="text" placeholder="이름 입력" maxlength="16">
+      <button id="save-score">기록 저장</button>
+    </div>
+    <div class="save-note">카운트업 게임을 8라운드까지 끝내면 최종 점수를 명예의 전당에 저장할 수 있어요. 이 아티팩트를 공유하면 링크를 받은 사람도 같은 명예의 전당에 기록을 남길 수 있어요.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+const svgNS = "http://www.w3.org/2000/svg";
+const board = document.getElementById('board');
+const numbers = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+const cx=200, cy=200;
+
+function polar(r, deg){ const rad=deg*Math.PI/180; return [cx+r*Math.cos(rad), cy+r*Math.sin(rad)]; }
+function wedge(rIn, rOut, a0, a1, fill){
+  const p1=polar(rOut,a0), p2=polar(rOut,a1), p3=polar(rIn,a1), p4=polar(rIn,a0);
+  const d = `M${p1[0]},${p1[1]} A${rOut},${rOut} 0 0 1 ${p2[0]},${p2[1]} L${p3[0]},${p3[1]} A${rIn},${rIn} 0 0 0 ${p4[0]},${p4[1]} Z`;
+  const el = document.createElementNS(svgNS,'path');
+  el.setAttribute('d', d); el.setAttribute('fill', fill);
+  el.setAttribute('stroke', '#222'); el.setAttribute('stroke-width', '0.5');
+  board.appendChild(el);
+}
+for(let i=0;i<20;i++){
+  const a0 = -90 + i*18 - 9, a1 = a0+18;
+  const dark = i%2===0;
+  wedge(18, 99, a0, a1, dark ? '#151515' : '#EFE6D2');
+  wedge(99, 107, a0, a1, dark ? '#C62828' : '#1B5E20');
+  wedge(107, 162, a0, a1, dark ? '#151515' : '#EFE6D2');
+  wedge(162, 170, a0, a1, dark ? '#C62828' : '#1B5E20');
+  const [nx,ny] = polar(184, a0+9);
+  const t = document.createElementNS(svgNS,'text');
+  t.setAttribute('x', nx); t.setAttribute('y', ny+4);
+  t.setAttribute('text-anchor','middle'); t.setAttribute('font-size','13');
+  t.setAttribute('font-weight','500'); t.setAttribute('fill','#fff');
+  t.textContent = numbers[i];
+  board.appendChild(t);
+}
+const bull1 = document.createElementNS(svgNS,'circle');
+bull1.setAttribute('cx',cx); bull1.setAttribute('cy',cy); bull1.setAttribute('r',18);
+bull1.setAttribute('fill','#1B5E20'); bull1.setAttribute('stroke','#222'); bull1.setAttribute('stroke-width','0.5');
+board.appendChild(bull1);
+const bull2 = document.createElementNS(svgNS,'circle');
+bull2.setAttribute('cx',cx); bull2.setAttribute('cy',cy); bull2.setAttribute('r',8);
+bull2.setAttribute('fill','#C62828');
+board.appendChild(bull2);
+
+const wrap = document.getElementById('board-wrap');
+const crosshair = document.getElementById('crosshair');
+const gaugePath = document.getElementById('gauge-path');
+const greatPath = document.getElementById('great-path');
+const perfectPath = document.getElementById('perfect-path');
+const gaugeMarker = document.getElementById('gauge-marker');
+const resultEl = document.getElementById('result');
+const totalEl = document.getElementById('total');
+const scoreLabelEl = document.getElementById('score-label');
+const roundEl = document.getElementById('round');
+const maxRoundEl = document.getElementById('max-round');
+const dartsEl = document.getElementById('darts');
+const resetBtn = document.getElementById('reset');
+const undoBtn = document.getElementById('undo-dart');
+const nextRoundBtn = document.getElementById('next-round');
+const modeCountupBtn = document.getElementById('mode-countup');
+const mode501Btn = document.getElementById('mode-501');
+const modeCricketBtn = document.getElementById('mode-cricket');
+const saveRow = document.getElementById('save-row');
+const nameInput = document.getElementById('name-input');
+const saveScoreBtn = document.getElementById('save-score');
+const lbListEl = document.getElementById('leaderboard-list');
+const slotEls = [document.getElementById('slot-0'), document.getElementById('slot-1'), document.getElementById('slot-2')];
+const cricketTargetsEl = document.getElementById('cricket-targets');
+
+const gP0={x:25,y:295}, gP1={x:50,y:150}, gP2={x:25,y:5};
+function bezier(t){
+  const x=(1-t)*(1-t)*gP0.x+2*(1-t)*t*gP1.x+t*t*gP2.x;
+  const y=(1-t)*(1-t)*gP0.y+2*(1-t)*t*gP1.y+t*t*gP2.y;
+  return {x,y};
+}
+function subPath(t0,t1){
+  let d='';
+  for(let i=0;i<=10;i++){
+    const t=t0+(t1-t0)*(i/10);
+    const p=bezier(t);
+    d += (i===0?'M':'L')+p.x+','+p.y+' ';
+  }
+  return d;
+}
+gaugePath.setAttribute('d', subPath(0,1));
+greatPath.setAttribute('d', subPath(0.25,0.75));
+perfectPath.setAttribute('d', subPath(0.46,0.54));
+
+const MAX_ROUNDS = {countup:8, '501':10, cricket:15};
+const cricketNumbers = [20,19,18,17,16,15,'Bull'];
+
+let mode='countup';
+let total=0, remaining=501, roundStartRemaining=501;
+let cricketTargets={}, cricketScore=0;
+let round=1, dartsLeft=3, gameEnded=false;
+let rawX=210, rawY=210, curX=210, curY=210;
+let charging=false, powerVal=0, phase=0;
+let dartCountInRound=0;
+let undoUsesLeft=9;
+const dartIcons = [];
+const history = [];
+const dartColors = ['#FF1744','#FFEA00','#00E5FF'];
+
+function resetCricketTargets(){
+  cricketTargets = {}; cricketNumbers.forEach(n=>cricketTargets[n]=0);
+  cricketScore=0;
+}
+resetCricketTargets();
+
+function renderCricketTargets(){
+  cricketTargetsEl.innerHTML = cricketNumbers.map(n=>{
+    const m = cricketTargets[n];
+    const closed = m>=3;
+    const dots = [0,1,2].map(i=>'<span class="dot'+(i<m?' on':'')+'"></span>').join('');
+    return '<div class="ct-badge'+(closed?' closed':'')+'"><div class="ct-num">'+n+'</div><div class="ct-dots">'+dots+'</div></div>';
+  }).join('');
+}
+
+function place(){ crosshair.style.left=curX+'px'; crosshair.style.top=curY+'px'; }
+place();
+function loop(){
+  if(charging){
+    curX += (rawX-curX)*0.12;
+    curY += (rawY-curY)*0.12;
+    phase += 0.12;
+    powerVal = Math.round(50+50*Math.sin(phase));
+    const pt = bezier(powerVal/100);
+    gaugeMarker.setAttribute('cx', pt.x);
+    gaugeMarker.setAttribute('cy', pt.y);
+  } else { curX=rawX; curY=rawY; }
+  place();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function updateRaw(e){
+  const rect=wrap.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  rawX=clientX-rect.left; rawY=clientY-rect.top;
+}
+wrap.addEventListener('mousemove', updateRaw);
+wrap.addEventListener('touchmove', (e)=>{ e.preventDefault(); updateRaw(e); }, {passive:false});
+
+function canThrow(){ return dartsLeft>0 && !gameEnded; }
+function startCharge(e){
+  if(!canThrow()) return;
+  updateRaw(e); charging=true; phase=0; resultEl.textContent='';
+}
+function endCharge(){
+  if(!charging) return;
+  charging=false;
+  prepareThrow(powerVal);
+}
+wrap.addEventListener('mousedown', startCharge);
+window.addEventListener('mouseup', endCharge);
+wrap.addEventListener('touchstart', (e)=>{ e.preventDefault(); startCharge(e); }, {passive:false});
+window.addEventListener('touchend', endCharge);
+
+function clampToBoard(x,y){
+  const dx=x-cx, dy=y-cy;
+  const r=Math.sqrt(dx*dx+dy*dy);
+  const maxR=195;
+  if(r<=maxR) return {x,y};
+  const s=maxR/r;
+  return {x:cx+dx*s, y:cy+dy*s};
+}
+
+function scoreAt(x,y){
+  const dx=x-cx, dy=y-cy;
+  const r=Math.sqrt(dx*dx+dy*dy);
+  if(r<=8) return {label:'D-Bull', score:50, ctNum:'Bull', marks:2};
+  if(r<=18) return {label:'S-Bull', score:25, ctNum:'Bull', marks:1};
+  if(r>170) return {label:'Miss', score:0, ctNum:null, marks:0};
+  const theta=Math.atan2(dy,dx)*180/Math.PI;
+  const shifted=((theta+90+9)%360+360)%360;
+  const idx=Math.floor(shifted/18)%20;
+  const num=numbers[idx];
+  if(r<=99) return {label:num+' single', score:num, ctNum:num, marks:1};
+  if(r<=107) return {label:num+' treble', score:num*3, ctNum:num, marks:3};
+  if(r<=162) return {label:num+' single', score:num, ctNum:num, marks:1};
+  return {label:num+' double', score:num*2, ctNum:num, marks:2};
+}
+
+function addDartIcon(dispX,dispY,colorIdx){
+  const el=document.createElement('div');
+  el.style.position='absolute';
+  el.style.left=dispX+'px'; el.style.top=dispY+'px';
+  el.style.width='16px'; el.style.height='16px';
+  el.style.transform='translate(-50%,-50%) rotate('+(Math.random()*360)+'deg)';
+  el.style.pointerEvents='none'; el.style.zIndex='4';
+  el.style.filter='drop-shadow(1px 3px 2px rgba(0,0,0,0.7))';
+  const c = dartColors[colorIdx%3];
+  el.innerHTML='<svg viewBox="0 0 20 20" width="16" height="16">'
+    +'<rect x="9" y="0" width="2" height="20" fill="'+c+'"></rect>'
+    +'<rect x="0" y="9" width="20" height="2" fill="'+c+'"></rect>'
+    +'<circle cx="10" cy="10" r="2.5" fill="#0b0b0b"></circle>'
+    +'</svg>';
+  wrap.appendChild(el);
+  dartIcons.push(el);
+  return el;
+}
+
+function clearDartIcons(){
+  dartIcons.forEach(el=>el.remove());
+  dartIcons.length=0;
+}
+
+function triggerHitEffect(label, dispX, dispY){
+  let text=null, color=null;
+  if(label==='D-Bull'){ text='D-BULL'; color='#FFD54F'; }
+  else if(label==='S-Bull'){ text='S-BULL'; color='#1D9E75'; }
+  else if(label.indexOf('treble')>=0){ text='TRIPLE'; color='#D42E2E'; }
+  else if(label.indexOf('double')>=0){ text='DOUBLE'; color='#1D68C4'; }
+  if(!text) return;
+  const ring=document.createElement('div');
+  ring.className='hit-ring';
+  ring.style.left=dispX+'px'; ring.style.top=dispY+'px';
+  ring.style.borderColor=color;
+  wrap.appendChild(ring);
+  setTimeout(()=>ring.remove(),600);
+  const pop=document.createElement('div');
+  pop.className='hit-pop';
+  pop.style.left=dispX+'px'; pop.style.top=dispY+'px';
+  pop.style.color=color;
+  pop.textContent=text;
+  wrap.appendChild(pop);
+  setTimeout(()=>pop.remove(),750);
+}
+
+function animateFlight(targetX,targetY,cb){
+  const fly=document.createElement('div');
+  fly.style.position='absolute';
+  fly.style.left=curX+'px';
+  fly.style.top=(wrap.clientHeight-6)+'px';
+  fly.style.width='9px'; fly.style.height='9px';
+  fly.style.borderRadius='50%'; fly.style.background='#fff';
+  fly.style.border='1px solid #111'; fly.style.zIndex='6';
+  fly.style.transform='translate(-50%,-50%) scale(0.7)';
+  fly.style.transition='left .26s cubic-bezier(.25,.6,.3,1), top .26s cubic-bezier(.25,.6,.3,1), transform .26s ease-out';
+  wrap.appendChild(fly);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    fly.style.left=targetX+'px'; fly.style.top=targetY+'px';
+    fly.style.transform='translate(-50%,-50%) scale(1)';
+  }));
+  setTimeout(()=>{ fly.remove(); cb(); }, 270);
+}
+
+function prepareThrow(power){
+  if(!canThrow()) return;
+  const err=Math.abs(50-power);
+  let offsetDist;
+  if(err<=4) offsetDist=Math.random()*8;
+  else if(err<=25) offsetDist=5+Math.random()*18;
+  else if(err<=35) offsetDist=30+Math.random()*35;
+  else offsetDist=70+Math.random()*80;
+  const angle=Math.random()*Math.PI*2;
+  const rect=wrap.getBoundingClientRect();
+  const scale=400/rect.width;
+  const rawBx=curX*scale+Math.cos(angle)*offsetDist;
+  const rawBy=curY*scale+Math.sin(angle)*offsetDist;
+  const clamped=clampToBoard(rawBx,rawBy);
+  const dispX=clamped.x/scale, dispY=clamped.y/scale;
+  animateFlight(dispX,dispY, ()=>finalizeThrow(clamped.x,clamped.y,dispX,dispY));
+}
+
+function updateLabels(){
+  maxRoundEl.textContent = MAX_ROUNDS[mode];
+  if(mode==='501'){ scoreLabelEl.textContent='Left'; totalEl.textContent=remaining; }
+  else if(mode==='cricket'){ scoreLabelEl.textContent='Score'; totalEl.textContent=cricketScore; }
+  else { scoreLabelEl.textContent='Score'; totalEl.textContent=total; }
+  roundEl.textContent = round;
+  dartsEl.textContent = dartsLeft;
+}
+
+function setSlot(idx, score){
+  const el = slotEls[idx];
+  if(score>0){ el.textContent = score; el.className = 'dart-slot filled'; }
+  else { el.textContent = 'MISS'; el.className = 'dart-slot miss'; }
+}
+function resetSlots(){ slotEls.forEach(el=>{ el.textContent='–'; el.className='dart-slot'; }); }
+
+function updateUndoLabel(){
+  undoBtn.textContent = '이전 다트 취소 ('+undoUsesLeft+')';
+  undoBtn.disabled = undoUsesLeft<=0 || dartCountInRound===0 || history.length===0;
+}
+
+function updateSaveRowVisibility(){
+  saveRow.style.display = (mode==='countup' && gameEnded) ? 'flex' : 'none';
+}
+function showGameOverBanner(msg){
+  resultEl.innerHTML = '<div class="game-over-banner"><div class="go-title">GAME OVER</div><div class="go-msg">'+msg+'</div></div>';
+}
+
+function snapshotState(){
+  return {
+    total, remaining, roundStartRemaining, round, dartsLeft, gameEnded,
+    dartCountInRound, cricketTargets: JSON.parse(JSON.stringify(cricketTargets)), cricketScore,
+    slotTexts: slotEls.map(el=>({text:el.textContent, cls:el.className}))
+  };
+}
+function restoreState(s){
+  total=s.total; remaining=s.remaining; roundStartRemaining=s.roundStartRemaining;
+  round=s.round; dartsLeft=s.dartsLeft; gameEnded=s.gameEnded;
+  dartCountInRound=s.dartCountInRound; cricketTargets=s.cricketTargets; cricketScore=s.cricketScore;
+  slotEls.forEach((el,i)=>{ el.textContent=s.slotTexts[i].text; el.className=s.slotTexts[i].cls; });
+  updateLabels(); renderCricketTargets(); updateSaveRowVisibility();
+  nextRoundBtn.style.display = (dartsLeft<=0 && !gameEnded) ? 'block' : 'none';
+}
+
+function applyCricketHit(res){
+  if(!res.ctNum || cricketNumbers.indexOf(res.ctNum)===-1){
+    resultEl.textContent = res.label + ' — 크리켓 대상 아님';
+    return;
+  }
+  let current = cricketTargets[res.ctNum];
+  const remainToClose = Math.max(0,3-current);
+  const closingMarks = Math.min(remainToClose, res.marks);
+  const overage = res.marks - closingMarks;
+  current = Math.min(3, current+closingMarks);
+  cricketTargets[res.ctNum]=current;
+  let pointsAdded=0;
+  if(overage>0 && current>=3){
+    const val = res.ctNum==='Bull' ? 25 : res.ctNum;
+    pointsAdded = overage*val;
+    cricketScore += pointsAdded;
+  }
+  renderCricketTargets();
+  resultEl.textContent = res.ctNum + (current>=3?' 클로즈':' 마크') + (pointsAdded>0 ? (' +'+pointsAdded+'점') : '');
+  if(cricketNumbers.every(n=>cricketTargets[n]>=3)){
+    gameEnded=true; dartsLeft=0;
+    showGameOverBanner('Cricket clear! All numbers closed. Score '+cricketScore+'.');
+  }
+}
+
+function finalizeThrow(bx,by,dispX,dispY){
+  const snap = snapshotState();
+  const res=scoreAt(bx,by);
+  const iconEl = addDartIcon(dispX,dispY,dartCountInRound);
+  triggerHitEffect(res.label, dispX, dispY);
+  setSlot(dartCountInRound, res.score);
+  dartCountInRound++;
+  dartsLeft-=1;
+
+  if(mode==='countup'){
+    total+=res.score;
+    resultEl.textContent = res.score>0 ? (res.label+' — '+res.score+' points') : 'Missed the board';
+  } else if(mode==='501'){
+    const newRemaining = remaining - res.score;
+    if(newRemaining<0 || newRemaining===1){
+      remaining = roundStartRemaining;
+      dartsLeft = 0;
+      resultEl.textContent = 'Bust! ' + res.label + ' — round score voided';
+    } else {
+      remaining = newRemaining;
+      resultEl.textContent = res.score>0 ? (res.label+' — '+res.score+' points') : 'Missed the board';
+      if(remaining===0){
+        gameEnded=true; dartsLeft=0;
+        showGameOverBanner('501 finished! Started this round from '+roundStartRemaining+'.');
+      }
+    }
+  } else if(mode==='cricket'){
+    applyCricketHit(res);
+  }
+
+  history.push({snap, iconEl});
+  updateUndoLabel();
+  updateLabels();
+
+  if(dartsLeft<=0 && !gameEnded){
+    if(round>=MAX_ROUNDS[mode]){
+      gameEnded=true;
+      const finalScore = mode==='501' ? ('Left: '+remaining) : (mode==='cricket' ? ('Score: '+cricketScore) : ('Score: '+total));
+      showGameOverBanner('Final round complete ('+round+'/'+MAX_ROUNDS[mode]+'). '+finalScore);
+      nextRoundBtn.style.display='none';
+    } else {
+      nextRoundBtn.style.display='block';
+    }
+  } else if(gameEnded){
+    nextRoundBtn.style.display='none';
+  }
+  updateSaveRowVisibility();
+}
+
+nextRoundBtn.addEventListener('click', ()=>{
+  round+=1; dartsLeft=3; dartCountInRound=0;
+  roundStartRemaining=remaining;
+  nextRoundBtn.style.display='none';
+  resultEl.textContent='';
+  clearDartIcons();
+  resetSlots();
+  updateLabels();
+  updateUndoLabel();
+});
+
+undoBtn.addEventListener('click', ()=>{
+  if(undoUsesLeft<=0 || dartCountInRound===0 || history.length===0) return;
+  const entry = history.pop();
+  if(entry.iconEl){
+    entry.iconEl.remove();
+    const idx = dartIcons.indexOf(entry.iconEl);
+    if(idx>=0) dartIcons.splice(idx,1);
+  }
+  restoreState(entry.snap);
+  undoUsesLeft -= 1;
+  updateUndoLabel();
+  resultEl.textContent = '이전 다트를 취소했어요';
+});
+
+function resetAll(){
+  total=0; remaining=501; roundStartRemaining=501;
+  resetCricketTargets();
+  round=1; dartsLeft=3; gameEnded=false; dartCountInRound=0;
+  undoUsesLeft=9; history.length=0;
+  resultEl.textContent=''; nextRoundBtn.style.display='none';
+  clearDartIcons();
+  resetSlots();
+  renderCricketTargets();
+  updateLabels();
+  updateUndoLabel();
+  updateSaveRowVisibility();
+}
+resetBtn.addEventListener('click', resetAll);
+
+function setMode(m){
+  mode=m;
+  modeCountupBtn.className = m==='countup' ? 'active' : '';
+  mode501Btn.className = m==='501' ? 'active' : '';
+  modeCricketBtn.className = m==='cricket' ? 'active' : '';
+  cricketTargetsEl.style.display = m==='cricket' ? 'flex' : 'none';
+  resetAll();
+}
+modeCountupBtn.addEventListener('click', ()=>setMode('countup'));
+mode501Btn.addEventListener('click', ()=>setMode('501'));
+modeCricketBtn.addEventListener('click', ()=>setMode('cricket'));
+
+// ---- Leaderboard (shared across everyone who opens this artifact) ----
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function renderLeaderboard(list){
+  if(!list || !list.length){
+    lbListEl.innerHTML = '<div style="opacity:.6;font-size:13px;">아직 기록이 없어요. 첫 기록을 남겨보세요!</div>';
+    return;
+  }
+  lbListEl.innerHTML = list.map((e,i)=>
+    '<div class="lb-row'+(i===0?' lb-first':'')+'">'
+    + '<span class="lb-rank">'+(i+1)+'</span>'
+    + '<span class="lb-name">'+escapeHtml(e.name)+'</span>'
+    + '<span class="lb-score">'+e.score+'</span>'
+    + '</div>'
+  ).join('');
+}
+async function loadLeaderboard(){
+  try{
+    const res = await window.storage.get('leaderboard', true);
+    return res ? JSON.parse(res.value) : [];
+  }catch(e){
+    return [];
+  }
+}
+async function submitScore(name, score){
+  try{
+    const list = await loadLeaderboard();
+    list.push({name: name || 'Player', score: score, date: new Date().toISOString().slice(0,10)});
+    list.sort((a,b)=>b.score-a.score);
+    const top10 = list.slice(0,10);
+    await window.storage.set('leaderboard', JSON.stringify(top10), true);
+    renderLeaderboard(top10);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+saveScoreBtn.addEventListener('click', async ()=>{
+  if(mode!=='countup' || !gameEnded) return;
+  const name = nameInput.value.trim().slice(0,16) || 'Player';
+  const ok = await submitScore(name, total);
+  resultEl.textContent = ok ? '기록이 명예의 전당에 저장됐어요!' : '저장에 실패했어요. 다시 시도해주세요.';
+});
+
+setMode('countup');
+loadLeaderboard().then(renderLeaderboard);
+})();
+</script>
+</body>
+</html>
